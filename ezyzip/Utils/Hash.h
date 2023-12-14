@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <stdexcept>
+#include <iomanip>  // Include for setw and setfill
+#include <sstream>
 #include "../cryptopp/keccak.h"
 #include "../cryptopp/sha.h"
 #include "../cryptopp/hmac.h"
@@ -67,6 +69,13 @@ public:
         std::vector<uint8_t> result(blake2b.DigestSize());
         blake2b.Final(result.data());
         return result;
+    }
+     static std::string to_hex_string(const std::vector<uint8_t>& input) {
+        std::stringstream ss;
+        for (auto byte : input) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+        }
+        return ss.str();
     }
 };
 

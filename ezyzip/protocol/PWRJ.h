@@ -1,3 +1,6 @@
+#ifndef PWRJ_H
+#define PWRJ_H
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -8,11 +11,9 @@
 #include "../PWRWallet.h"
 #include "../Block/Block.h"
 
-
 using json = nlohmann::json;
 using namespace std;
 
-#pragma once
 class PWRJ {
 private:
     static CURL* curl;
@@ -82,30 +83,26 @@ public:
     // Define Block class or use appropriate data structure
 
     static Block getBlockByNumber(long blockNumber) {
-    try {
+    
         std::string url = rpcNodeUrl + "/block/?blockNumber=" + std::to_string(blockNumber);
         std::string response = performHttpRequest(url);
 
-json root;
-json reader;
+        json root;
+        json reader;
 
-if (reader.parse(response)) {
-    if (root.contains("block")) {
-        // Assuming Block class has a constructor that takes a json::value_type
-        return Block(root["block"]);
-    } else {
-        throw std::runtime_error("Invalid JSON format: 'block' not found.");
-    }
-} else {
-    throw std::runtime_error("Failed to parse JSON response.");
+        if (reader.parse(response)) {
+            if (root.contains("block")) {
+                // Assuming Block class has a constructor that takes a json::value_type
+                return Block(root["block"]);
+            } else {
+                throw std::runtime_error("Invalid JSON format: 'block' not found.");
+            }
+        } else {
+            throw std::runtime_error("Failed to parse JSON response.");
+        }
+  
 }
-    } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
-        // Handle the exception by returning a default-constructed Block or handle accordingly
-       
-        // return e;
-    }
-}
+
 
     // ... Other methods ...
 
@@ -130,6 +127,10 @@ private:
         }
         return response;
     }
+
+
+
+
 
 static int  parseValidatorsCount(const std::string& url) {
     try {
@@ -162,38 +163,9 @@ static int getActiveValidatorsCount() {
     std::string url = rpcNodeUrl + "/activeValidatorsCount/";
     return parseValidatorsCount(url);
 }
-static std::vector<Validator> getAllValidators() {
-    try {
-        std::string url = rpcNodeUrl + "/allValidators/";
-        std::string response = performHttpRequest(url);
 
-        json root = json::parse(response);
-        if (root.find("validators") != root.end()) {
-            const json& validators = root["validators"];
-            std::vector<Validator> validatorsList;
 
-            for (const auto& validatorObject : validators) {
-                Validator validator(
-                    "0x" + validatorObject["address"].get<std::string>(),
-                    validatorObject["ip"].get<std::string>(),
-                    validatorObject["badActor"].get<bool>(),
-                    validatorObject["votingPower"].get<long>(),
-                    validatorObject["totalShares"].get<long>(),
-                    validatorObject["delegatorsCount"].get<int>(),
-                    validatorObject["status"].get<std::string>()
-                );
-                validatorsList.push_back(validator);
-            }
-
-            return validatorsList;
-        } else {
-            throw std::runtime_error("Invalid JSON format: 'validators' not found.");
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
-        return std::vector<Validator>();
-    }
-}
+    static std::vector<Validator> getAllValidators(); 
 
 static long getDelegatedPWR(const std::string& delegatorAddress, const std::string& validatorAddress) {
     try {
@@ -358,7 +330,7 @@ static Response broadcastTxn(const std::vector<uint8_t>& txn) {
 
             // Prepare the JSON payload with the transaction data
             json jsonPayload;
-            jsonPayload["txn"] = to_hex_string(txn);
+            jsonPayload["txn"] = Hash::to_hex_string(Hash::sha3(txn));
             std::string jsonStr = jsonPayload.dump();
 
             // Set up libcurl options
@@ -375,7 +347,7 @@ static Response broadcastTxn(const std::vector<uint8_t>& txn) {
             }
 
             // Assuming you have a function to process the response and create a Response object
-            return processCurlResponse(curl);
+            return processCurlResponse(curl,txn);
 
         } catch (const std::exception& e) {
             return Response(false, nullptr, e.what());
@@ -386,21 +358,23 @@ static Response broadcastTxn(const std::vector<uint8_t>& txn) {
     }
     private:
     // Helper function to process libcurl response and create a Response object
-    static Response processCurlResponse(CURL* curl) {
-        long responseCode;
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
+    static Response processCurlResponse(CURL* curl, const std::vector<uint8_t>&  txn) {
+    long responseCode;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
 
-        if (responseCode == 200) {
-            // If successful, return a Response object with success and the hash of the transaction
-            return Response(true, "0x" + to_hex_string(Hash::sha3(txn)), nullptr);
-        } else {
-            // Handle other HTTP errors by throwing a runtime error with the HTTP status code
-            throw std::runtime_error("Failed with HTTP error code: " + std::to_string(responseCode));
-        }
+    if (responseCode == 200) {
+        // If successful, return a Response object with success and the hash of the transaction
+        std::string txnHash = "0x" + Hash::to_hex_string(Hash::sha3(txn));
+        return Response(true, txnHash, "");
+    } else {
+        // Handle other HTTP errors by throwing a runtime error with the HTTP status code
+        throw std::runtime_error("Failed with HTTP error code: " + std::to_string(responseCode));
     }
+}
+
 
 };
-
+#endif // PWRJ_H
 // // Initialize static members
 // httplib::Client PWRJ::client = httplib::Client("localhost", 80); // Update with actual host and port
 // std::string PWRJ::rpcNodeUrl;
